@@ -20,6 +20,7 @@
 #include <iostream>
 #include <fstream>
 #include <time.h> 
+#include <assert.h>
 #include "ns3/core-module.h"
 #include "ns3/qbb-helper.h"
 #include "ns3/point-to-point-helper.h"
@@ -30,25 +31,158 @@
 #include "ns3/broadcom-node.h"
 #include "ns3/packet.h"
 #include "ns3/error-model.h"
+#include "ns3/flow-monitor.h"
+#include "ns3/flow-monitor-helper.h"
+#include "ns3/flow-monitor-module.h"
+#include "ns3/flow-probe.h"
+#include "ns3/udp-echo-helper.h"
+#include "ns3/udp-client-server-helper.h"
+
+
 
 using namespace ns3;
+
+class my_app_data {
+public:
+	my_app_data(uint32_t port, uint32_t maxpacketcount, Ptr<Application> client, Ptr<Application> server);
+	uint32_t port;
+	uint32_t maxpacketcount;
+	Ptr<Application> client;
+	Ptr<Application> server;
+	bool handled;
+};
+my_app_data::my_app_data(uint32_t port, uint32_t maxpacketcount, Ptr<Application> client, Ptr<Application> server) {
+	this->port = port;
+	this->maxpacketcount = maxpacketcount;
+	this->client = client;
+	this->server = server;
+	this->handled = false;
+}
+
+std::vector< my_app_data* > app_data_container;
 
 NS_LOG_COMPONENT_DEFINE("GENERIC_SIMULATION");
 
 bool enable_qcn = true, use_dynamic_pfc_threshold = true, packet_level_ecmp = false, flow_level_ecmp = false;
 uint32_t packet_payload_size = 1000, l2_chunk_size = 0, l2_ack_interval = 0;
 double pause_time = 5, simulator_stop_time = 3.01, app_start_time = 1.0, app_stop_time = 9.0;
-std::string data_rate, link_delay, topology_file, flow_file, tcp_flow_file, trace_file, trace_output_file;
+std::string data_rate, link_delay, topology_file, flow_file, tcp_flow_file, trace_file, trace_output_file, xml_output_file;
 bool used_port[65536] = { 0 };
 
 double cnp_interval = 50, alpha_resume_interval = 55, rp_timer, dctcp_gain = 1 / 16, np_sampling_interval = 0, pmax = 1;
-uint32_t byte_counter, fast_recovery_times = 5, kmax = 60, kmin = 60;
+uint32_t byte_counter, fast_recovery_times = 5, kmax = 60, kmin = 60, buffer_size = 1000000;
 std::string rate_ai, rate_hai;
 
 bool clamp_target_rate = false, clamp_target_rate_after_timer = false, send_in_chunks = true, l2_wait_for_ack = false, l2_back_to_zero = false, l2_test_read = false;
 double error_rate_per_link = 0.0;
 
+uint32_t packetSize, pg;
+Time interPacketInterval;
 
+void handler_print_time();
+void handler_create_app(uint32_t src, uint32_t dst, uint32_t maxPacketCount, uint32_t pg);
+NodeContainer n;
+//ApplicationContainer app_container_server;
+//ApplicationContainer app_container_client;
+
+uint32_t app_counter = 0;
+uint32_t stopped_app_counter = 0;
+
+void handler_print_time() {
+	Time current_time = Simulator::Now();
+	double current_time_seconds = current_time.GetSeconds();
+	std::cout << "Current simulation time: " << current_time_seconds << " seconds" << std::endl;
+	Simulator::Schedule(Seconds(0.005), &handler_print_time);
+}
+
+void handler_create_app(uint32_t src, uint32_t dst, uint32_t maxPacketCount, uint32_t pg) {
+	// for all existing applications, check whether the corresponding server has received the maxPacketCount
+	// if yes, stop the client-server, free the port
+
+	//update the port ...
+	//std::cout << "here 1\n";
+	for (int i = app_data_container.size() - 1; i >= 0; i--) {
+		//std::cout << i <<  " here 2\n";
+		my_app_data *app_data = app_data_container[i];
+		//std::cout << i << " here 3 " << app_data->handled << "\n";
+		if (app_data->handled == true) {
+			continue;
+		}
+		//std::cout << "here 3\n";
+		Ptr<Application> client_app = app_data->client;
+		Ptr<Application> server_app = app_data->server;
+		uint32_t port_used = app_data->port;
+		uint32_t maxpacketcount = app_data->maxpacketcount;
+
+		// get the maxpacketcount from client and the received count from server, get the port from server
+		// if both are same of received >= maxpacketcount, free the port, stop the client and server
+		uint32_t packets_received;
+		if (send_in_chunks) {
+			assert(false);
+		}
+		else {
+			packets_received = DynamicCast<UdpServer>(server_app)->GetReceived();
+		}
+
+		if (packets_received >= maxpacketcount) {
+			used_port[port_used] = false;
+			//std::cout << "Port " << port_used << " freed" << std::endl;
+			app_data->handled = true;
+			client_app->SetStopTime(Seconds(0));
+			server_app->SetStopTime(Seconds(0));
+			stopped_app_counter++;
+			if (stopped_app_counter % 1000 == 0) {
+				std::cout << "Stopped apps: " << stopped_app_counter << std::endl;
+			}
+			app_data_container.erase(app_data_container.begin() + i);
+			free(app_data);
+		}
+	}
+
+	// create the new client-server here
+	uint32_t port = int(UniformVariable(0, 1).GetValue() * 40000);
+	while (used_port[port]) {
+		port = int(UniformVariable(0, 1).GetValue() * 40000);
+		continue;
+	}
+	used_port[port] = true;
+	NS_ASSERT(n.Get(src)->GetNodeType() == 0 && n.Get(dst)->GetNodeType() == 0);
+	Ptr<Ipv4> ipv4 = n.Get(dst)->GetObject<Ipv4>();
+	Ipv4Address serverAddress = ipv4->GetAddress(1, 0).GetLocal(); //GetAddress(0,0) is the loopback 127.0.0.1
+	if (send_in_chunks)
+	{
+		assert(false);
+	}
+	else
+	{
+		//std::cout << "Port used: " << port << std::endl;
+		UdpServerHelper server0(port);
+		ApplicationContainer app0s_c = server0.Install(n.Get(dst));
+		Ptr<Application> app0s = app0s_c.Get(0);
+		app0s->SetStartTime(Seconds(0));
+		app0s->SetStopTime(Seconds(10));
+		//app_container_server.Add(app0s);
+
+		UdpClientHelper client0(serverAddress, port, pg); //Add Priority
+		client0.SetAttribute("MaxPackets", UintegerValue(maxPacketCount));
+		client0.SetAttribute("Interval", TimeValue(interPacketInterval));
+		client0.SetAttribute("PacketSize", UintegerValue(packetSize));
+		ApplicationContainer app0c_c = client0.Install(n.Get(src));
+		Ptr<Application> app0c = app0c_c.Get(0);
+		app0c->SetStartTime(Seconds(0));
+		app0c->SetStopTime(Seconds(10));
+		//app_container_client.Add(app0c);
+
+		my_app_data *app_data_ptr = new my_app_data(port, maxPacketCount, app0c, app0s);
+		app_data_container.push_back(app_data_ptr);
+		app_counter++;
+		if (app_counter % 1000 == 0) {
+			std::cout << " App " << app_counter << " created" << std::endl;
+		}
+	}
+
+
+}
 
 int main(int argc, char *argv[])
 {
@@ -308,6 +442,13 @@ int main(int argc, char *argv[])
 				kmin = v;
 				std::cout << "KMIN\t\t\t\t" << kmin << "\n";
 			}
+			else if (key.compare("BUFFER_SIZE") == 0)
+			{
+				uint32_t v;
+				conf >> v;
+				buffer_size = v;
+				std::cout << "BUFFER_SIZE\t\t\t\t" << buffer_size << "\n";
+			}
 			else if (key.compare("PMAX") == 0)
 			{
 				double v;
@@ -370,6 +511,17 @@ int main(int argc, char *argv[])
 				error_rate_per_link = v;
 				std::cout << "ERROR_RATE_PER_LINK\t\t" << error_rate_per_link << "\n";
 			}
+			else if (key.compare("XML_FILE") == 0)
+			{
+				std::string v;
+				conf >> v;
+				xml_output_file = v;
+				if (argc > 3)
+				{
+					xml_output_file = xml_output_file + std::string(argv[3]);
+				}
+				std::cout << "XML_FILE\t\t" << xml_output_file << "\n";
+			}
 			fflush(stdout);
 		}
 		conf.close();
@@ -421,7 +573,7 @@ int main(int argc, char *argv[])
 	tcpflowf >> tcp_flow_num;
 
 
-	NodeContainer n;
+
 	n.Create(node_num);
 	for (uint32_t i = 0; i < switch_num; i++)
 	{
@@ -484,6 +636,7 @@ int main(int argc, char *argv[])
 		sprintf(ipstring, "10.%d.%d.0", i / 254 + 1, i % 254 + 1);
 		ipv4.SetBase(ipstring, "255.255.255.0");
 		ipv4.Assign(d);
+		std::cout << "Parsed link " << i << std::endl;
 	}
 
 
@@ -501,79 +654,69 @@ int main(int argc, char *argv[])
 
 	NS_LOG_INFO("Create Applications.");
 
-	uint32_t packetSize = packet_payload_size;
-	Time interPacketInterval = Seconds(0.0000005 / 2);
+	packetSize = packet_payload_size;
+	interPacketInterval = Seconds(0.0000005 / 2);
 
-	for (uint32_t i = 0; i < flow_num; i++)
-	{
-		uint32_t src, dst, pg, maxPacketCount, port;
+	// Start and stop the required applications depending upon the flow trace now
+	// Once an application is stopped, the port occupied by the client-server is cleared
+
+	for (uint32_t i = 0; i < flow_num; i++) {
+		uint32_t src, dst, pg, maxPacketCount;
 		double start_time, stop_time;
-		while (used_port[port = int(UniformVariable(0, 1).GetValue() * 40000)])
-			continue;
-		used_port[port] = true;
 		flowf >> src >> dst >> pg >> maxPacketCount >> start_time >> stop_time;
-		NS_ASSERT(n.Get(src)->GetNodeType() == 0 && n.Get(dst)->GetNodeType() == 0);
-		Ptr<Ipv4> ipv4 = n.Get(dst)->GetObject<Ipv4>();
-		Ipv4Address serverAddress = ipv4->GetAddress(1, 0).GetLocal(); //GetAddress(0,0) is the loopback 127.0.0.1
-
-		if (send_in_chunks)
-		{
-			UdpEchoServerHelper server0(port, pg); //Add Priority
-			ApplicationContainer apps0s = server0.Install(n.Get(dst));
-			apps0s.Start(Seconds(app_start_time));
-			apps0s.Stop(Seconds(app_stop_time));
-			UdpEchoClientHelper client0(serverAddress, port, pg); //Add Priority
-			client0.SetAttribute("MaxPackets", UintegerValue(maxPacketCount));
-			client0.SetAttribute("Interval", TimeValue(interPacketInterval));
-			client0.SetAttribute("PacketSize", UintegerValue(packetSize));
-			ApplicationContainer apps0c = client0.Install(n.Get(src));
-			apps0c.Start(Seconds(start_time));
-			apps0c.Stop(Seconds(stop_time));
+		// stop_time is assumed to be a very large value, actual stop time of application is depended upon the maxPacketCount
+		Simulator::Schedule(Seconds(start_time), &handler_create_app, src, dst, maxPacketCount, pg);
+		if (i % 10000 == 0) {
+			std::cout << "Flow " << i << " parsed" << std::endl;
 		}
-		else
-		{
-			UdpServerHelper server0(port);
-			ApplicationContainer apps0s = server0.Install(n.Get(dst));
-			apps0s.Start(Seconds(app_start_time));
-			apps0s.Stop(Seconds(app_stop_time));
-			UdpClientHelper client0(serverAddress, port, pg); //Add Priority
-			client0.SetAttribute("MaxPackets", UintegerValue(maxPacketCount));
-			client0.SetAttribute("Interval", TimeValue(interPacketInterval));
-			client0.SetAttribute("PacketSize", UintegerValue(packetSize));
-			ApplicationContainer apps0c = client0.Install(n.Get(src));
-			apps0c.Start(Seconds(start_time));
-			apps0c.Stop(Seconds(stop_time));
-		}
-
 	}
 
+	Simulator::Schedule(Seconds(2), &handler_print_time);
 
-	for (uint32_t i = 0; i < tcp_flow_num; i++)
-	{
-		uint32_t src, dst, pg, maxPacketCount, port;
-		double start_time, stop_time;
-		while (used_port[port = int(UniformVariable(0, 1).GetValue() * 40000)])
-			continue;
-		used_port[port] = true;
-		tcpflowf >> src >> dst >> pg >> maxPacketCount >> start_time >> stop_time;
-		NS_ASSERT(n.Get(src)->GetNodeType() == 0 && n.Get(dst)->GetNodeType() == 0);
-		Ptr<Ipv4> ipv4 = n.Get(dst)->GetObject<Ipv4>();
-		Ipv4Address serverAddress = ipv4->GetAddress(1, 0).GetLocal();
+	//
+	// Now, do the actual simulation.
+	//
 
-		Address sinkLocalAddress(InetSocketAddress(Ipv4Address::GetAny(), port));
-		PacketSinkHelper sinkHelper("ns3::TcpSocketFactory", sinkLocalAddress);
+	Ptr<FlowMonitor> flowmonitor;
+	FlowMonitorHelper flowmhelper;
+	flowmonitor = flowmhelper.InstallAll();
 
-		ApplicationContainer sinkApp = sinkHelper.Install(n.Get(dst));
-		sinkApp.Start(Seconds(app_start_time));
-		sinkApp.Stop(Seconds(app_stop_time));
 
-		BulkSendHelper source("ns3::TcpSocketFactory", InetSocketAddress(serverAddress, port));
-		// Set the amount of data to send in bytes.  Zero is unlimited.
-		source.SetAttribute("MaxBytes", UintegerValue(0));
-		ApplicationContainer sourceApps = source.Install(n.Get(src));
-		sourceApps.Start(Seconds(start_time));
-		sourceApps.Stop(Seconds(stop_time));
-	}
+	std::cout << "Running Simulation.\n";
+	fflush(stdout);
+	NS_LOG_INFO("Run Simulation.");
+	Simulator::Stop(Seconds(simulator_stop_time));
+	Simulator::Run();
+
+
+
+
+	//for (uint32_t i = 0; i < tcp_flow_num; i++)
+	//{
+	//	uint32_t src, dst, pg, maxPacketCount, port;
+	//	double start_time, stop_time;
+	//	while (used_port[port = int(UniformVariable(0, 1).GetValue() * 40000)])
+	//		continue;
+	//	used_port[port] = true;
+	//	tcpflowf >> src >> dst >> pg >> maxPacketCount >> start_time >> stop_time;
+	//	NS_ASSERT(n.Get(src)->GetNodeType() == 0 && n.Get(dst)->GetNodeType() == 0);
+	//	Ptr<Ipv4> ipv4 = n.Get(dst)->GetObject<Ipv4>();
+	//	Ipv4Address serverAddress = ipv4->GetAddress(1, 0).GetLocal();
+
+	//	Address sinkLocalAddress(InetSocketAddress(Ipv4Address::GetAny(), port));
+	//	PacketSinkHelper sinkHelper("ns3::TcpSocketFactory", sinkLocalAddress);
+
+	//	ApplicationContainer sinkApp = sinkHelper.Install(n.Get(dst));
+	//	sinkApp.Start(Seconds(app_start_time));
+	//	sinkApp.Stop(Seconds(app_stop_time));
+
+	//	BulkSendHelper source("ns3::TcpSocketFactory", InetSocketAddress(serverAddress, port));
+	//	// Set the amount of data to send in bytes.  Zero is unlimited.
+	//	source.SetAttribute("MaxBytes", UintegerValue(0));
+	//	ApplicationContainer sourceApps = source.Install(n.Get(src));
+	//	sourceApps.Start(Seconds(start_time));
+	//	sourceApps.Stop(Seconds(stop_time));
+	//}
 
 
 	topof.close();
@@ -581,14 +724,9 @@ int main(int argc, char *argv[])
 	tracef.close();
 	tcpflowf.close();
 
-	//
-	// Now, do the actual simulation.
-	//
-	std::cout << "Running Simulation.\n";
-	fflush(stdout);
-	NS_LOG_INFO("Run Simulation.");
-	Simulator::Stop(Seconds(simulator_stop_time));
-	Simulator::Run();
+	////////////////////////////////////////////////////////////////////////////////////
+
+	flowmonitor->SerializeToXmlFile(xml_output_file, true, true);
 	Simulator::Destroy();
 	NS_LOG_INFO("Done.");
 

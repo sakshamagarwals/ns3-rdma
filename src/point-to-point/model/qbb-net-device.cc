@@ -572,6 +572,12 @@ namespace ns3 {
 			}
 			else // If this is a Pause, stop the corresponding queue
 			{
+				if (m_node->GetId() == 149) {
+					std::cout << "Received the PAUSA frame at node 149  \n";
+				}
+				if (m_node->GetId() == 95) {
+					std::cout << "Received the PAUSA frame at node 95  \n";
+				}
 				if (!m_qbbEnabled) return;
 				PauseHeader pauseh;
 				p->RemoveHeader(pauseh);
@@ -595,6 +601,10 @@ namespace ns3 {
 			// This is a Congestion signal
 			// Then, extract data from the congestion packet.
 			// We assume, without verify, the packet is destinated to me
+
+			if (m_node->GetId() == 95) {
+				std::cout << "Received QCN at node: 95\n";
+			}
 			CnHeader cnHead;
 			p->RemoveHeader(cnHead);
 			uint32_t qIndex = cnHead.GetQindex();
@@ -928,6 +938,16 @@ namespace ns3 {
 				FlowIdTag t;
 				packet->PeekPacketTag(t);
 				uint32_t inDev = t.GetFlowId();
+
+				if (m_node->GetId() == 153 && inDev == 6) {
+					packet->Print(std::cout);
+					std::cout << "\n";
+					std::cout << "Ingress headroom status: " << m_node->m_broadcom->m_usedIngressPGHeadroomBytes[inDev][3] << "IngressPGUsed status: " << m_node->m_broadcom->m_usedIngressPGBytes[inDev][3] << " Port: " << inDev << "\n";
+				}
+				/*if (m_node->m_broadcom->CheckIngressAdmission(inDev, qIndex, packet->GetSize()) == 0) {
+					packet->Print(std::cout);
+					std::cout << "\n";
+				}*/
 				if (m_node->m_broadcom->CheckIngressAdmission(inDev, qIndex, packet->GetSize()) && m_node->m_broadcom->CheckEgressAdmission(m_ifIndex, qIndex, packet->GetSize()))			// Admission control
 				{
 					m_node->m_broadcom->UpdateIngressAdmission(inDev, qIndex, packet->GetSize());
@@ -944,6 +964,12 @@ namespace ns3 {
 			}
 			else			//pause or cnp, doesn't need admission control, just go
 			{
+				//if (m_node->GetId() == 149 && h.GetProtocol() == 0xFE) {
+				//	std::cout << "Sent PAUSE frame to node 149 \n";
+				//}
+				//if (m_node->GetId() == 95 && h.GetProtocol() == 0xFE) {
+				//	std::cout << "Sent PAUSE frame to node 95 \n";
+				//}
 				m_queue->Enqueue(packet, qIndex);
 				DequeueAndTransmit();
 			}
@@ -979,6 +1005,10 @@ namespace ns3 {
 				m_node->m_broadcom->m_pause_remote[inDev][qIndex] = true;
 				Simulator::Cancel(m_recheckEvt[inDev][qIndex]);
 				m_recheckEvt[inDev][qIndex] = Simulator::Schedule(MicroSeconds(m_pausetime / 2), &QbbNetDevice::CheckQueueFull, this, inDev, qIndex);
+
+				//if (m_node->GetId() == 153) {
+				//	std::cout << "Sent PAUSE frame by node 153:: Port: " << inDev << "\n";
+				//}
 			}
 		}
 

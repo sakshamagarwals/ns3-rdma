@@ -109,11 +109,15 @@ namespace ns3 {
 
 		void SetDynamicThreshold();
 
-	protected:
+		uint32_t m_node_id;
+
+	//protected:
 		uint32_t GetIngressSP(uint32_t port, uint32_t pgIndex);
 		uint32_t GetEgressSP(uint32_t port, uint32_t qIndex);
 
-	private:
+	//private:
+
+		
 
 		uint32_t m_maxBufferBytes;
 		uint32_t m_usedTotalBytes;

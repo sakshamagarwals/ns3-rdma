@@ -53,6 +53,7 @@ namespace ns3 {
 
 	BroadcomNode::BroadcomNode()
 	{
+		m_node_id = 0;
 		m_maxBufferBytes = 9000000; //9MB
 		m_usedTotalBytes = 0;
 
@@ -128,7 +129,7 @@ namespace ns3 {
 			{
 				if (m_usedIngressPGHeadroomBytes[port][qIndex] + psize > m_pg_hdrm_limit) // exceed headroom space
 				{
-					std::cout << "WARNING: Drop because ingress headroom full:" << m_usedIngressPGHeadroomBytes[port][qIndex] << "\t" << m_pg_hdrm_limit << "\n";
+					std::cout << "WARNING: Drop because ingress headroom full:" << m_usedIngressPGHeadroomBytes[port][qIndex] << "\t" << m_pg_hdrm_limit << "Node id: " << m_node_id << " Port: " << port << " qIndex: " << qIndex <<  "\n";
 					return false;
 				}
 			}
@@ -168,6 +169,9 @@ namespace ns3 {
 		m_usedIngressSPBytes[GetIngressSP(port, qIndex)] += psize;
 		m_usedIngressPortBytes[port] += psize;
 		m_usedIngressPGBytes[port][qIndex] += psize;
+		if (m_node_id == 153) {
+			std::cout << "Updated UsedIngressPGBytes: " << m_usedIngressPGBytes[port][qIndex] <<  " Port: " << port << " qIndex: " << qIndex << "\n";
+		}
 		if (m_usedIngressSPBytes[GetIngressSP(port, qIndex)] > m_buffer_cell_limit_sp)	//begin to use headroom buffer
 		{
 			m_usedIngressPGHeadroomBytes[port][qIndex] += psize;
@@ -208,6 +212,9 @@ namespace ns3 {
 		m_usedIngressSPBytes[GetIngressSP(port, qIndex)] -= psize;
 		m_usedIngressPortBytes[port] -= psize;
 		m_usedIngressPGBytes[port][qIndex] -= psize;
+		if (m_node_id == 153) {
+			std::cout << "Decreased UsedIngressPGBytes: " << m_usedIngressPGBytes[port][qIndex] << " Port: " << port << " qIndex: " << qIndex << "\n";
+		}
 		if ((double)m_usedIngressPGHeadroomBytes[port][qIndex] - psize > 0)
 			m_usedIngressPGHeadroomBytes[port][qIndex] -= psize;
 		else
@@ -246,11 +253,14 @@ namespace ns3 {
 			for (uint32_t i = 0; i < qCnt; i++)
 			{
 				pClasses[i] = false;
+				if (m_node_id == 153) {
+					std::cout << "UsedIngressPGBytes: " << m_usedIngressPGBytes[port][i] << " sedIngressSP(Port,qIndex): " << m_usedIngressSPBytes[GetIngressSP(port, qIndex)] << " Port: " << port << " qIndex: " << qIndex << " i: " << i << "\n";
+				}
 				if (m_usedIngressPGBytes[port][i] <= m_pg_min_cell + m_port_min_cell)
 					continue;
 				if (i == 1 && !m_enable_pfc_on_dctcp)			//dctcp
 					continue;
-
+				
 				if ((double)m_usedIngressPGBytes[port][i] - m_pg_min_cell - m_port_min_cell > m_pg_shared_alpha_cell*((double)m_buffer_cell_limit_sp - m_usedIngressSPBytes[GetIngressSP(port, qIndex)]))
 				{
 					pClasses[i] = true;
