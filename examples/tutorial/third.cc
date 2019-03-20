@@ -188,6 +188,7 @@ int main(int argc, char *argv[])
 {
 	clock_t begint, endt;
 	begint = clock();
+	std::cout.precision(9);
 #ifndef PGO_TRAINING
 	if (argc > 1)
 #else

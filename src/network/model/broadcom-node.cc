@@ -102,7 +102,7 @@ namespace ns3 {
 		m_enable_pfc_on_dctcp = 1;
 		m_dctcp_threshold = 40 * 1030;
 		m_dctcp_threshold_max = 400 * 1030;
-		m_pg_shared_alpha_cell = 16;
+		m_pg_shared_alpha_cell = 1;// 16;
 		m_port_shared_alpha_cell = 128;   //not used for now. not sure whether this is used on switches
 		m_pg_shared_alpha_cell_off_diff = 16;
 		m_port_shared_alpha_cell_off_diff = 16;
@@ -120,6 +120,7 @@ namespace ns3 {
 	{
 		if (m_usedTotalBytes + psize > m_maxBufferBytes)  //buffer full, usually should not reach here.
 		{
+
 			std::cout << "WARNING: Drop because ingress buffer full\n";
 			return false;
 		}
@@ -129,7 +130,7 @@ namespace ns3 {
 			{
 				if (m_usedIngressPGHeadroomBytes[port][qIndex] + psize > m_pg_hdrm_limit) // exceed headroom space
 				{
-					std::cout << "WARNING: Drop because ingress headroom full:" << m_usedIngressPGHeadroomBytes[port][qIndex] << "\t" << m_pg_hdrm_limit << "Node id: " << m_node_id << " Port: " << port << " qIndex: " << qIndex <<  "\n";
+					std::cout << Simulator::Now().GetSeconds() << " WARNING: Drop because ingress headroom full:" << m_usedIngressPGHeadroomBytes[port][qIndex] << "\t" << m_pg_hdrm_limit << "Node id: " << m_node_id << " Port: " << port << " qIndex: " << qIndex <<  "\n";
 					return false;
 				}
 			}
@@ -169,8 +170,8 @@ namespace ns3 {
 		m_usedIngressSPBytes[GetIngressSP(port, qIndex)] += psize;
 		m_usedIngressPortBytes[port] += psize;
 		m_usedIngressPGBytes[port][qIndex] += psize;
-		if (m_node_id == 153) {
-			std::cout << "Updated UsedIngressPGBytes: " << m_usedIngressPGBytes[port][qIndex] <<  " Port: " << port << " qIndex: " << qIndex << "\n";
+		if (m_node_id == 153 && port == 6) {
+			std::cout << Simulator::Now().GetSeconds() << " Updated UsedIngressPGBytes: " << m_usedIngressPGBytes[port][qIndex] <<  " Port: " << port << " qIndex: " << qIndex << "\n";
 		}
 		if (m_usedIngressSPBytes[GetIngressSP(port, qIndex)] > m_buffer_cell_limit_sp)	//begin to use headroom buffer
 		{
@@ -212,8 +213,8 @@ namespace ns3 {
 		m_usedIngressSPBytes[GetIngressSP(port, qIndex)] -= psize;
 		m_usedIngressPortBytes[port] -= psize;
 		m_usedIngressPGBytes[port][qIndex] -= psize;
-		if (m_node_id == 153) {
-			std::cout << "Decreased UsedIngressPGBytes: " << m_usedIngressPGBytes[port][qIndex] << " Port: " << port << " qIndex: " << qIndex << "\n";
+		if (m_node_id == 153 && port == 6) {
+			std::cout << Simulator::Now().GetSeconds() << " Decreased UsedIngressPGBytes: " << m_usedIngressPGBytes[port][qIndex] << " Port: " << port << " qIndex: " << qIndex << "\n";
 		}
 		if ((double)m_usedIngressPGHeadroomBytes[port][qIndex] - psize > 0)
 			m_usedIngressPGHeadroomBytes[port][qIndex] -= psize;
@@ -253,9 +254,9 @@ namespace ns3 {
 			for (uint32_t i = 0; i < qCnt; i++)
 			{
 				pClasses[i] = false;
-				if (m_node_id == 153) {
-					std::cout << "UsedIngressPGBytes: " << m_usedIngressPGBytes[port][i] << " sedIngressSP(Port,qIndex): " << m_usedIngressSPBytes[GetIngressSP(port, qIndex)] << " Port: " << port << " qIndex: " << qIndex << " i: " << i << "\n";
-				}
+				//if (m_node_id == 153) {
+				//	std::cout << "UsedIngressPGBytes: " << m_usedIngressPGBytes[port][i] << " sedIngressSP(Port,qIndex): " << m_usedIngressSPBytes[GetIngressSP(port, qIndex)] << " Port: " << port << " qIndex: " << qIndex << " i: " << i << "\n";
+				//}
 				if (m_usedIngressPGBytes[port][i] <= m_pg_min_cell + m_port_min_cell)
 					continue;
 				if (i == 1 && !m_enable_pfc_on_dctcp)			//dctcp
