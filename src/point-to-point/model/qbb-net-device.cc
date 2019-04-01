@@ -19,6 +19,7 @@
 */
 
 #define __STDC_LIMIT_MACROS 1
+#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include "ns3/qbb-net-device.h"
@@ -265,7 +266,7 @@ namespace ns3 {
 		{
 			p = m_queue->DequeueNIC(m_paused);
 		}
-		else   //switch, doesn't care about qcn, just send
+		else   //switch, doesn't care about qcn, just send 
 		{
 			//p = m_queue->Dequeue(m_paused);		//this is strict priority
 			p = m_queue->DequeueRR(m_paused);		//this is round-robin
@@ -356,6 +357,7 @@ namespace ns3 {
 					p->PeekPacketTag(t);
 					uint32_t inDev = t.GetFlowId();
 					m_node->m_broadcom->RemoveFromIngressAdmission(inDev, m_queue->GetLastQueue(), p->GetSize());
+					//std::cout <<  " Packet Info (RM): " << " src: " << h.GetSource() << " dst: " << h.GetDestination() << "\n";
 					m_node->m_broadcom->RemoveFromEgressAdmission(m_ifIndex, m_queue->GetLastQueue(), p->GetSize());
 					if (m_qcnEnabled)
 					{
@@ -427,18 +429,6 @@ namespace ns3 {
 	void
 		QbbNetDevice::PauseFinish(unsigned qIndex)
 	{
-		if (m_node->GetId() == 95) {
-			std::cout << Simulator::Now().GetSeconds() << " RESUME at node 95  \n";
-		}
-		if (m_node->GetId() == 144) {
-			std::cout << Simulator::Now().GetSeconds() << " RESUME at node 144  \n";
-		}
-		if (m_node->GetId() == 149) {
-			std::cout << Simulator::Now().GetSeconds() << " RESUME at node 149  \n";
-		}
-		if (m_node->GetId() == 153) {
-			std::cout << Simulator::Now().GetSeconds() << " RESUME at node 153  \n";
-		}
 		Resume(qIndex);
 	}
 
@@ -465,7 +455,6 @@ namespace ns3 {
 
 		Ipv4Header ipv4h;
 		p->RemoveHeader(ipv4h);
-
 		if ((ipv4h.GetProtocol() != 0xFF && ipv4h.GetProtocol() != 0xFD && ipv4h.GetProtocol() != 0xFC) || m_node->GetNodeType() > 0)
 		{ //This is not QCN feedback, not NACK, or I am a switch so I don't care
 			if (ipv4h.GetProtocol() != 0xFE) //not PFC
@@ -518,16 +507,42 @@ namespace ns3 {
 							}
 							tmp.total = 1;
 							tmp.port = udph.GetSourcePort();
+							//std::cout << " ECN source size: " << m_ecn_source->size() << " Node: " << this->m_node << "\n";
 							ReceiverNextExpectedSeq[m_ecn_source->size()] = 0;
+
+							//std::cout << "Survive 1: " << m_ecn_source->size() << " Node: " << this->m_node << " " << ReceiverNextExpectedSeq[4096] << std::endl;
 							m_nackTimer[m_ecn_source->size()] = Time(0);
+							//std::cout << "Survive 2: " << m_ecn_source->size() << " Node: " << this->m_node << std::endl;
 							m_milestone_rx[m_ecn_source->size()] = m_ack_interval;
+
+							//std::cout << "Survive: 3" << m_ecn_source->size() << " Node: " << this->m_node << std::endl;
 							m_lastNACK[m_ecn_source->size()] = -1;
+							//std::cout << "get remote1: " << &m_nackTimer[m_ecn_source->size()] << std::endl;
+							//std::cout << "get remote2: " << &m_milestone_rx[m_ecn_source->size()] << std::endl;
+							//std::cout << "get remote3: " << &m_lastNACK[m_ecn_source->size()] << std::endl;
+
+							//std::cout << "get remote1: " << GetRemote() << std::endl;
+
+							//std::cout << "Survive: 4" << m_ecn_source->size() << " Node: " << this->m_node << std::endl;
 							key = m_ecn_source->size();
 							m_ecn_source->push_back(tmp);
 							CheckandSendQCN(tmp.source, tmp.qIndex, tmp.port);
+							//std::cout << "get remote1: " << &m_nackTimer[m_ecn_source->size()] << std::endl;
+							//std::cout << "get remote2: " << &m_milestone_rx[m_ecn_source->size()] << std::endl;
+							//std::cout << "get remote3: " << &m_lastNACK[m_ecn_source->size()] << std::endl;
+							//std::cout << "get remote4: " << &m_ecn_source << std::endl;
+
+							//std::cout << "get remote5: " << &m_milestone_rx[m_ecn_source->size()] << std::endl;
+
+							//std::cout << "get remote6: " << &m_milestone_rx[m_ecn_source->size()] << std::endl;
+
+							//std::cout << "Survive 5:" << m_ecn_source->size() << " Node: " << this->m_node << std::endl;
+
 						}
 
 						int x = ReceiverCheckSeq(sth.GetSeq(), key);
+						//std::cout << "Survive 6:" << m_ecn_source->size() << " Node: " << this->m_node << std::endl;
+
 						if (x == 2) //generate NACK
 						{
 							Ptr<Packet> newp = Create<Packet>(0);
@@ -578,9 +593,12 @@ namespace ns3 {
 								m_queue->Enqueue(newp, qCnt - 1);
 							DequeueAndTransmit();
 						}
+						//std::cout << "Survive 7:" << m_ecn_source->size() << " Node: " << this->m_node << std::endl;
 					}
 				}
+
 				PointToPointReceive(packet);
+
 			}
 			else // If this is a Pause, stop the corresponding queue
 			{
@@ -589,34 +607,68 @@ namespace ns3 {
 				PauseHeader pauseh;
 				p->RemoveHeader(pauseh);
 				unsigned qIndex = pauseh.GetQIndex();
+				
 				m_paused[qIndex] = true;
+				//std::cout << " qIndex inside receive pfC: " << qIndex << std::endl;
+				/*if (m_node->GetId() == 49) {
+					std::cout << " qIndex at node 49 after receving pause: " << qIndex << " Nse: " << m_paused[qIndex] << " " << &m_paused[0] << "\n";
+				}*/
 				if (pauseh.GetTime() > 0)
 				{
-					if (m_node->GetId() == 153) {
+					//std::cout << Simulator::Now().GetSeconds() << " Received the PAUSE frame at node: " << m_node->GetId() << " from src: " << ipv4h.GetSource() << " qindex: " << qIndex << "\n";
+
+					/*if (m_node->GetId() == 153) {
 						pauseh.Print(std::cout);
 						std::cout << "\n";
 						std::cout << Simulator::Now().GetSeconds() << " Received the PAUSE frame at node 153  qindex: " << qIndex << "\n";
-					}
-					if (m_node->GetId() == 149) {
-						pauseh.Print(std::cout);
-						std::cout << "\n";
-						std::cout << Simulator::Now().GetSeconds() << " Received the PAUSE frame at node 149  qindex: " << qIndex << "\n";
-					}
-					if (m_node->GetId() == 95) {
-						pauseh.Print(std::cout);
-						std::cout << "\n";
-						std::cout << Simulator::Now().GetSeconds() << " Received the PAUSE frame at node 95  qindex: " << qIndex << "\n";
-					}
+					}*/
+					//if (m_node->GetId() == 147) {
+					//	pauseh.Print(std::cout);
+					//	std::cout << "\n";
+					//	std::cout << Simulator::Now().GetSeconds() << " Received the PAUSE frame at node 147  qindex: " << qIndex << "\n";
+					//}
+					//if (m_node->GetId() == 149) {
+					//	pauseh.Print(std::cout);
+					//	std::cout << "\n";
+					//	std::cout << Simulator::Now().GetSeconds() << " Received the PAUSE frame at node 149  qindex: " << qIndex << "\n";
+					//}
+					//if (m_node->GetId() == 151) {
+					//	pauseh.Print(std::cout);
+					//	std::cout << "\n";
+					//	std::cout << Simulator::Now().GetSeconds() << " Received the PAUSE frame at node 151  qindex: " << qIndex << "\n";
+					//}
+
 					Simulator::Cancel(m_resumeEvt[qIndex]);
 					m_resumeEvt[qIndex] = Simulator::Schedule(MicroSeconds(pauseh.GetTime()), &QbbNetDevice::PauseFinish, this, qIndex);
 				}
 				else
 				{
-					if (m_node->GetId() == 153) {
+					/*if (m_node->GetId() == 146) {
+						pauseh.Print(std::cout);
+						std::cout << "\n";*/
+						//std::cout << Simulator::Now().GetSeconds() << " Received the RESUME frame at node: " << m_node->GetId() << " qindex: " << qIndex << "\n";
+					//}
+					//if (m_node->GetId() == 147) {
+					//	pauseh.Print(std::cout);
+					//	std::cout << "\n";
+					//	std::cout << Simulator::Now().GetSeconds() << " Received the RESUME frame at node 147  qindex: " << qIndex << "\n";
+					//}
+					//if (m_node->GetId() == 149) {
+					//	pauseh.Print(std::cout);
+					//	std::cout << "\n";
+					//	std::cout << Simulator::Now().GetSeconds() << " Received the RESUME frame at node 149  qindex: " << qIndex << "\n";
+					//}
+					//if (m_node->GetId() == 151) {
+					//	pauseh.Print(std::cout);
+					//	std::cout << "\n";
+					//	std::cout << Simulator::Now().GetSeconds() << " Received the RESUME frame at node 151  qindex: " << qIndex << "\n";
+					//}
+					/*if (m_node->GetId() == 153) {
 						pauseh.Print(std::cout);
 						std::cout << "\n";
 						std::cout << Simulator::Now().GetSeconds() << " Received the RESUME frame at node 153  qindex: " << qIndex << "\n";
 					}
+					
 					if (m_node->GetId() == 149) {
 						pauseh.Print(std::cout);
 						std::cout << "\n";
@@ -626,7 +678,7 @@ namespace ns3 {
 						pauseh.Print(std::cout);
 						std::cout << "\n";
 						std::cout << Simulator::Now().GetSeconds() << " Received the RESUME frame at node 95  qindex: " << qIndex << "\n";
-					}
+					}*/
 					Simulator::Cancel(m_resumeEvt[qIndex]);
 					PauseFinish(qIndex);
 				}
@@ -639,9 +691,9 @@ namespace ns3 {
 			// Then, extract data from the congestion packet.
 			// We assume, without verify, the packet is destinated to me
 
-			if (m_node->GetId() == 95) {
+			/*if (m_node->GetId() == 95) {
 				std::cout << Simulator::Now().GetSeconds() << " Received QCN at node: 95\n";
-			}
+			}*/
 			CnHeader cnHead;
 			p->RemoveHeader(cnHead);
 			uint32_t qIndex = cnHead.GetQindex();
@@ -737,7 +789,12 @@ namespace ns3 {
 
 			}
 
-			m_queue->RecoverQueue(m_sendingBuffer[i], i);
+			if (m_qcnEnabled) {
+				m_queue->RecoverQueue(m_sendingBuffer[i], i);
+			}
+			else {
+				m_queue->RecoverQueue(m_sendingBuffer[i], m_findex_qindex_map[i]);
+			}
 
 			if (m_waitAck && m_waitingAck[i])
 			{
@@ -818,6 +875,8 @@ namespace ns3 {
 
 			PointToPointReceive(packet);
 		}
+		//std::cout << "2" << std::endl;
+
 	}
 
 	void
@@ -842,8 +901,11 @@ namespace ns3 {
 			// more complicated devices.
 			//
 			m_snifferTrace(packet);
+
 			m_promiscSnifferTrace(packet);
+
 			m_phyRxEndTrace(packet);
+
 			//
 			// Strip off the point-to-point protocol header and forward this packet
 			// up the protocol stack.  Since this is a simple point-to-point link,
@@ -859,7 +921,11 @@ namespace ns3 {
 			}
 
 			m_macRxTrace(packet);
+
 			m_rxCallback(this, packet, protocol, GetRemote());
+
+			//std::cout << "Survive 7.5.8:" << std::endl;
+
 		}
 	}
 
@@ -900,7 +966,7 @@ namespace ns3 {
 		Ipv4Header h;
 		packet->PeekHeader(h);
 		unsigned qIndex;
-		if (h.GetProtocol() == 0xFF || h.GetProtocol() == 0xFE || h.GetProtocol() == 0xFD)  //QCN or PFC or NACK, go highest priority
+		if (h.GetProtocol() == 0xFF || h.GetProtocol() == 0xFE || h.GetProtocol() == 0xFD || h.GetProtocol() == 0xFC)  //QCN or PFC or NACK, go highest priority
 		{
 			qIndex = qCnt - 1;
 		}
@@ -909,10 +975,19 @@ namespace ns3 {
 			Ptr<Packet> p = packet->Copy();
 			p->RemoveHeader(h);
 
-			if (h.GetProtocol() == 17)
+			if (h.GetProtocol() == 17) {
+				//std::cout << " UDP HERE!!!" << " Protocol: " << int(h.GetProtocol()) << std::endl;
 				qIndex = GetPriority(p);
-			else
+			}
+			else {
+				std::cout << " HERE!!!"  << " Protocol: " << int(h.GetProtocol()) << std::endl;
 				qIndex = 1; //dctcp
+			}
+			/*if ((qIndex != 3 && qIndex != 7)) {
+				std::cout << " QIndex is " << qIndex  << " m_node: " << m_node->GetId() << std::endl;
+				assert(false);
+			}*/
+				
 		}
 
 		Ptr<Packet> p = packet->Copy();
@@ -957,10 +1032,17 @@ namespace ns3 {
 
 				if (m_qcnEnabled)
 				{
+					//std::cout << " above " << std::endl;
+
 					m_queue->Enqueue(packet, i);
 				}
 				else
 				{
+					/*if ((qIndex != 3 && qIndex != 7)) {
+						std::cout << " QIndex is " << qIndex << " m_node: "  << m_node->GetId() << std::endl;
+						assert(false);
+					}
+					std::cout << " below " << std::endl;*/
 					m_queue->Enqueue(packet, qIndex);
 				}
 			}
@@ -975,22 +1057,20 @@ namespace ns3 {
 				FlowIdTag t;
 				packet->PeekPacketTag(t);
 				uint32_t inDev = t.GetFlowId();
-
-				if (m_node->GetId() == 153 && inDev == 6) {
-					//packet->Print(std::cout);
-					//std::cout << "\n";
-					//std::cout << "Ingress headroom status: " << m_node->m_broadcom->m_usedIngressPGHeadroomBytes[inDev][3] << "IngressPGUsed status: " << m_node->m_broadcom->m_usedIngressPGBytes[inDev][3] << " Port: " << inDev << "\n";
-				}
-				/*if (m_node->m_broadcom->CheckIngressAdmission(inDev, qIndex, packet->GetSize()) == 0) {
-					packet->Print(std::cout);
-					std::cout << "\n";
+				/*if ((qIndex != 3 && qIndex != 7)) {
+					std::cout << " QIndex is " << qIndex << " m_node: " << m_node->GetId() << std::endl;
+					assert(false);
 				}*/
+
 				if (m_node->m_broadcom->CheckIngressAdmission(inDev, qIndex, packet->GetSize()) && m_node->m_broadcom->CheckEgressAdmission(m_ifIndex, qIndex, packet->GetSize()))			// Admission control
 				{
+					
 					m_node->m_broadcom->UpdateIngressAdmission(inDev, qIndex, packet->GetSize());
+					//std::cout <<  " Packet Info: " << " src: " << h.GetSource() << " dst: " << h.GetDestination() << "\n";
 					m_node->m_broadcom->UpdateEgressAdmission(m_ifIndex, qIndex, packet->GetSize());
 
 					m_macTxTrace(packet);
+					//std::cout << " much below" << std::endl;
 					m_queue->Enqueue(packet, qIndex); // go into MMU and queues
 				}
 				DequeueAndTransmit();
@@ -998,6 +1078,7 @@ namespace ns3 {
 				{
 					CheckQueueFull(inDev, qIndex); //check queue full
 				}
+
 			}
 			else			//pause or cnp, doesn't need admission control, just go
 			{
@@ -1007,8 +1088,10 @@ namespace ns3 {
 				//if (m_node->GetId() == 95 && h.GetProtocol() == 0xFE) {
 				//	std::cout << "Sent PAUSE frame to node 95 \n";
 				//}
+				//std::cout << " much much below" << std::endl;
 				m_queue->Enqueue(packet, qIndex);
 				DequeueAndTransmit();
+				
 			}
 
 		}
@@ -1039,13 +1122,9 @@ namespace ns3 {
 				ipv4h.SetIdentification(UniformVariable(0, 65536).GetValue());
 				p->AddHeader(ipv4h);
 				device->Send(p, Mac48Address("ff:ff:ff:ff:ff:ff"), 0x0800);
-				m_node->m_broadcom->m_pause_remote[inDev][qIndex] = true;
-				Simulator::Cancel(m_recheckEvt[inDev][qIndex]);
-				m_recheckEvt[inDev][qIndex] = Simulator::Schedule(MicroSeconds(m_pausetime / 2), &QbbNetDevice::CheckQueueFull, this, inDev, qIndex);
-
-				//if (m_node->GetId() == 153) {
-				//	std::cout << "Sent PAUSE frame by node 153:: Port: " << inDev << "\n";
-				//}
+				m_node->m_broadcom->m_pause_remote[inDev][j] = true;
+				Simulator::Cancel(m_recheckEvt[inDev][j]);
+				m_recheckEvt[inDev][j] = Simulator::Schedule(MicroSeconds(m_pausetime / 2), &QbbNetDevice::CheckQueueFull, this, inDev, j);
 			}
 		}
 
@@ -1058,9 +1137,6 @@ namespace ns3 {
 			{
 				Ptr<Packet> p = Create<Packet>(0);
 				PauseHeader pauseh(0, m_queue->GetNBytes(j), j); //resume
-				/*if ((m_node->GetId() == 153) || (m_node->GetId() == 149) || (m_node->GetId() == 144)) {
-					std::cout << " Creating RESUME packet node: " << m_node->GetId() << " j: " << j << "\n";
-				}*/
 				p->AddHeader(pauseh);
 				Ipv4Header ipv4h;  // Prepare IPv4 header
 				ipv4h.SetProtocol(0xFE);
@@ -1158,15 +1234,24 @@ namespace ns3 {
 	Address
 		QbbNetDevice::GetRemote(void) const
 	{
+		//std::cout << "Survive 7.5.7.1:" << std::endl;
+
 		NS_ASSERT(m_channel->GetNDevices() == 2);
 		for (uint32_t i = 0; i < m_channel->GetNDevices(); ++i)
 		{
 			Ptr<NetDevice> tmp = m_channel->GetDevice(i);
 			if (tmp != this)
 			{
+				//std::cout << this->GetNode()->GetId() << std::endl;
+				//std::cout << "temp addresss" << tmp << std::endl;
+				//std::cout << tmp <<  std::endl;
+				//std::cout << "Survive 7.5.7.2:" << std::endl;
+
 				return tmp->GetAddress();
 			}
 		}
+		//std::cout << "Survive 7.5.7.3:" << std::endl;
+
 		NS_ASSERT(false);
 		return Address();  // quiet compiler.
 	}

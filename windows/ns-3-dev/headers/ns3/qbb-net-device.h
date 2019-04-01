@@ -112,7 +112,7 @@ public:
    void SetQueue (Ptr<BEgressQueue> q);
    Ptr<BEgressQueue> GetQueue ();
 
-protected:
+//protected:
 
 	//Ptr<Node> m_node;
 

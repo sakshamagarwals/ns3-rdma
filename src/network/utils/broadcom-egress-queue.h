@@ -35,7 +35,7 @@ namespace ns3 {
 	class BEgressQueue : public Queue {
 	public:
 		static TypeId GetTypeId(void);
-		static const unsigned fCnt = 1024; //max number of queues, 128 for NICs
+		static const unsigned fCnt = 256; //max number of queues, 128 for NICs
 		static const unsigned qCnt = 8; //max number of queues, 8 for switches
 		BEgressQueue();
 		virtual ~BEgressQueue();
@@ -50,7 +50,7 @@ namespace ns3 {
 		uint32_t m_fcount;
 		void RecoverQueue(Ptr<DropTailQueue> buffer, uint32_t i);
 
-	private:
+	//private:
 		bool DoEnqueue(Ptr<Packet> p, uint32_t qIndex);
 		Ptr<Packet> DoDequeue(bool paused[]);
 		Ptr<Packet> DoDequeueNIC(bool paused[]);

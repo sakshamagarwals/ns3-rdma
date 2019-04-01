@@ -393,6 +393,7 @@ PointToPointNetDevice::SetAddress (Address address)
 Address
 PointToPointNetDevice::GetAddress (void) const
 {
+
   return m_address;
 }
 

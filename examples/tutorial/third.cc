@@ -92,7 +92,7 @@ void handler_print_time() {
 	Time current_time = Simulator::Now();
 	double current_time_seconds = current_time.GetSeconds();
 	std::cout << "Current simulation time: " << current_time_seconds << " seconds" << std::endl;
-	Simulator::Schedule(Seconds(0.005), &handler_print_time);
+	Simulator::Schedule(Seconds(0.001), &handler_print_time);
 }
 
 void handler_create_app(uint32_t src, uint32_t dst, uint32_t maxPacketCount, uint32_t pg) {
@@ -176,7 +176,7 @@ void handler_create_app(uint32_t src, uint32_t dst, uint32_t maxPacketCount, uin
 		my_app_data *app_data_ptr = new my_app_data(port, maxPacketCount, app0c, app0s);
 		app_data_container.push_back(app_data_ptr);
 		app_counter++;
-		if (app_counter % 1000 == 0) {
+		if (app_counter % 100 == 0) {
 			std::cout << " App " << app_counter << " created" << std::endl;
 		}
 	}
@@ -672,7 +672,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	Simulator::Schedule(Seconds(2), &handler_print_time);
+	Simulator::Schedule(Seconds(1), &handler_print_time);
 
 	//
 	// Now, do the actual simulation.

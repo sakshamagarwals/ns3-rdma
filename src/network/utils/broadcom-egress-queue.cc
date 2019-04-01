@@ -26,6 +26,7 @@
 #include "ns3/simulator.h"
 #include "drop-tail-queue.h"
 #include "broadcom-egress-queue.h"
+#include <assert.h>
 
 NS_LOG_COMPONENT_DEFINE("BEgressQueue");
 
@@ -133,6 +134,7 @@ namespace ns3 {
 	Ptr<Packet>
 		BEgressQueue::DoDequeueNIC(bool paused[])
 	{
+		std::cout << "Inside dequeue NIC: \n";
 		NS_LOG_FUNCTION(this);
 		if (m_bytesInQueueTotal == 0)
 		{
@@ -150,6 +152,9 @@ namespace ns3 {
 			}
 		}
 		qIndex = (qIndex + m_rrlast) % qCnt;
+		if (paused[qIndex] && found == true) {
+			assert(false);
+		}
 		if (found)
 		{
 			Ptr<Packet> p = m_queues[qIndex]->Dequeue();
@@ -188,7 +193,7 @@ namespace ns3 {
 		{
 			for (qIndex = qCnt - 2; qIndex < qCnt; qIndex--) //strict policy
 			{
-				if (m_bwsatisfied[qIndex].GetTimeStep() < Simulator::Now().GetTimeStep() && m_queues[qIndex]->GetNPackets() > 0)
+				if (!paused[qIndex]  &&  m_bwsatisfied[qIndex].GetTimeStep() < Simulator::Now().GetTimeStep() && m_queues[qIndex]->GetNPackets() > 0)
 				{
 					found = true;
 					break;
@@ -280,6 +285,10 @@ namespace ns3 {
 	bool
 		BEgressQueue::Enqueue(Ptr<Packet> p, uint32_t qIndex)
 	{
+		/*if ((qIndex != 3 && qIndex != 7)) {
+			std::cout << " QIndex is " << qIndex << std::endl;
+			assert(false);
+		}*/
 		NS_LOG_FUNCTION(this << p);
 		//
 		// If DoEnqueue fails, Queue::Drop is called by the subclass

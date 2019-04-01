@@ -50,7 +50,7 @@ namespace ns3 {
 		uint32_t m_fcount;
 		void RecoverQueue(Ptr<DropTailQueue> buffer, uint32_t i);
 
-	private:
+	//private:
 		bool DoEnqueue(Ptr<Packet> p, uint32_t qIndex);
 		Ptr<Packet> DoDequeue(bool paused[]);
 		Ptr<Packet> DoDequeueNIC(bool paused[]);

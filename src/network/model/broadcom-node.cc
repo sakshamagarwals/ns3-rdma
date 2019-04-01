@@ -17,6 +17,7 @@
 *
 * Author: Yibo Zhu <yibzh@microsoft.com>
 */
+#include <assert.h>
 #include <iostream>
 #include <fstream>
 #include "node.h"
@@ -120,7 +121,7 @@ namespace ns3 {
 	{
 		if (m_usedTotalBytes + psize > m_maxBufferBytes)  //buffer full, usually should not reach here.
 		{
-
+			assert(false);
 			std::cout << "WARNING: Drop because ingress buffer full\n";
 			return false;
 		}
@@ -130,7 +131,10 @@ namespace ns3 {
 			{
 				if (m_usedIngressPGHeadroomBytes[port][qIndex] + psize > m_pg_hdrm_limit) // exceed headroom space
 				{
-					std::cout << Simulator::Now().GetSeconds() << " WARNING: Drop because ingress headroom full:" << m_usedIngressPGHeadroomBytes[port][qIndex] << "\t" << m_pg_hdrm_limit << "Node id: " << m_node_id << " Port: " << port << " qIndex: " << qIndex <<  "\n";
+					std::cout << m_pg_shared_alpha_cell << std::endl;
+					
+					std::cout << Simulator::Now().GetSeconds() << " WARNING: Drop because ingress headroom full:" << m_usedIngressPGHeadroomBytes[port][qIndex] << "\t" << m_pg_hdrm_limit << "Node id: " << m_node_id << " Port: " << port << " qIndex: " << qIndex <<  std::endl;
+					assert(false);
 					return false;
 				}
 			}
@@ -146,16 +150,19 @@ namespace ns3 {
 	{
 		if (m_usedEgressSPBytes[GetEgressSP(port, qIndex)] + psize > m_op_buffer_shared_limit_cell)  //exceed the sp limit
 		{
+			assert(false);
 			std::cout << "WARNING: Drop because egress SP buffer full\n";
 			return false;
 		}
 		if (m_usedEgressPortBytes[port] + psize > m_op_uc_port_config_cell)	//exceed the port limit
 		{
+			assert(false);
 			std::cout << "WARNING: Drop because egress Port buffer full\n";
 			return false;
 		}
 		if (m_usedEgressQSharedBytes[port][qIndex] + psize > m_op_uc_port_config1_cell) //exceed the queue limit
 		{
+			assert(false);
 			std::cout << "WARNING: Drop because egress Q buffer full\n";
 			return false;
 		}
@@ -170,9 +177,6 @@ namespace ns3 {
 		m_usedIngressSPBytes[GetIngressSP(port, qIndex)] += psize;
 		m_usedIngressPortBytes[port] += psize;
 		m_usedIngressPGBytes[port][qIndex] += psize;
-		if (m_node_id == 153 && port == 6) {
-			std::cout << Simulator::Now().GetSeconds() << " Updated UsedIngressPGBytes: " << m_usedIngressPGBytes[port][qIndex] <<  " Port: " << port << " qIndex: " << qIndex << "\n";
-		}
 		if (m_usedIngressSPBytes[GetIngressSP(port, qIndex)] > m_buffer_cell_limit_sp)	//begin to use headroom buffer
 		{
 			m_usedIngressPGHeadroomBytes[port][qIndex] += psize;
@@ -213,9 +217,6 @@ namespace ns3 {
 		m_usedIngressSPBytes[GetIngressSP(port, qIndex)] -= psize;
 		m_usedIngressPortBytes[port] -= psize;
 		m_usedIngressPGBytes[port][qIndex] -= psize;
-		if (m_node_id == 153 && port == 6) {
-			std::cout << Simulator::Now().GetSeconds() << " Decreased UsedIngressPGBytes: " << m_usedIngressPGBytes[port][qIndex] << " Port: " << port << " qIndex: " << qIndex << "\n";
-		}
 		if ((double)m_usedIngressPGHeadroomBytes[port][qIndex] - psize > 0)
 			m_usedIngressPGHeadroomBytes[port][qIndex] -= psize;
 		else
@@ -254,9 +255,6 @@ namespace ns3 {
 			for (uint32_t i = 0; i < qCnt; i++)
 			{
 				pClasses[i] = false;
-				//if (m_node_id == 153) {
-				//	std::cout << "UsedIngressPGBytes: " << m_usedIngressPGBytes[port][i] << " sedIngressSP(Port,qIndex): " << m_usedIngressSPBytes[GetIngressSP(port, qIndex)] << " Port: " << port << " qIndex: " << qIndex << " i: " << i << "\n";
-				//}
 				if (m_usedIngressPGBytes[port][i] <= m_pg_min_cell + m_port_min_cell)
 					continue;
 				if (i == 1 && !m_enable_pfc_on_dctcp)			//dctcp
